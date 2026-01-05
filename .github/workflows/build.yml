@@ -92,7 +92,8 @@ jobs:
         run: |
           echo "Disk space before cleanup:"
           df -h
-          sudo rm -rf /tmp/* || true
+          # Clean up old temporary files (older than 1 day)
+          sudo find /tmp -type f -atime +1 -delete || true
           echo "Disk space after cleanup:"
           df -h
 
@@ -126,8 +127,8 @@ jobs:
         run: |
           echo "Disk space before cleanup:"
           df -h
-          # Clean up any .git directories in cloned repos to save space
-          find kernel_platform -name ".git" -type d -exec rm -rf {} + || true
+          # Clean up .git directories in cloned repos to save space
+          find kernel_platform -name ".git" -type d -prune -exec rm -rf {} \; || true
           echo "Disk space after cleanup:"
           df -h
 
