@@ -103,7 +103,7 @@ jobs:
       - name: Build Kernel
         shell: bash
         run: | 
-          build/build.sh
+          ./kernel_platform/oplus/build/oplus_build_kernel.sh waipio gki
           export CCACHE_DIR="${CCACHE_DIR}"
           make -C kernel_platform/msm-kernel O=out/msm-kernel distclean
           make -C kernel_platform/msm-kernel O=out/msm-kernel BUILD_CONFIG=${{ github.event.inputs.build_config }}
