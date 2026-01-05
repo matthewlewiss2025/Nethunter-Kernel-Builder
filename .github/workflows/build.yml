@@ -104,3 +104,9 @@ jobs:
         run: |
           sudo rm -rf /tmp/*
           df -h
+
+      - name: Upload Kernel Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: kernel-output
+          path: out/msm-kernel/dist
