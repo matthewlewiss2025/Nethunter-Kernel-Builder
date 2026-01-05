@@ -1,129 +1,272 @@
-name: "Build kernels"
+name: NetHunter Kernel - OnePlus 10 Pro (NE2215) OOS 14
 
 on:
   workflow_dispatch:
-
-env:
-  CONFIGURATION: "repos.json"
-  OUT_DIR: "out"
+    inputs:
+      build_config:
+        description: BUILD_CONFIG to use (default waipio)
+        required: true
+        default: kernel_platform/common/build.config.msm.waipio
+      package_anykernel:
+        description: Also package flashable AnyKernel3 zip
+        required: false
+        default: "true"
+      ccachesize:
+        description: ccache max size (e.g. 15G)
+        required: false
+        default: 15G
 
 jobs:
-  set-repos:
-    name: "Parse repos.json"
-    runs-on: ubuntu-latest
-    outputs:
-      repos: ${{ steps.matrix.outputs.repos }}
-    steps:
-      - name: "Checkout"
-        uses: actions/checkout@v4
-
-      - name: "Validate and generate matrix"
-        id: matrix
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq
-          test -f "${{ env.CONFIGURATION }}"
-          jq -e '.' "${{ env.CONFIGURATION }}" >/dev/null
-          echo "repos=$(jq -c '.' "${{ env.CONFIGURATION }}")" >> "$GITHUB_OUTPUT"
-
-  build-kernel:
-    name: "Build kernel"
-    runs-on: ubuntu-latest
-    needs: [set-repos]
-    strategy:
-      max-parallel: 2
-      fail-fast: false
-      matrix:
-        repos: ${{ fromJSON(needs.set-repos.outputs.repos) }}
+  build:
+    name: Build Kernel
+    runs-on: ubuntu-22.04
     env:
-      kernelDir: ${{ matrix.repos.kernelSource.name }}_${{ matrix.repos.kernelSource.device }}
-      kernelName: ${{ matrix.repos.kernelSource.name }}
-      kernelRepo: ${{ matrix.repos.kernelSource.repo }}
-      kernelBranch: ${{ matrix.repos.kernelSource.branch }}
-      kernelDevice: ${{ matrix.repos.kernelSource.device }}
-      DEFCONFIG_NAME: ${{ matrix.repos.kernelSource.device }}_defconfig
-      withKernelSU: ${{ matrix.repos.withKernelSU }}
+      # Build metadata
+      KBUILD_BUILD_USER: "github-actions"
+      KBUILD_BUILD_HOST: "github.com"
+      # Paths pinned by manifest
+      CLANG_DIR: kernel_platform/prebuilts-master/clang/host/linux-x86
+      GCC_HOST_DIR: kernel_platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8
+      DIST_DIR: out/msm-kernel/dist
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      # Device labeling for artifacts
+      DEVICE_CODENAME: "NE2215"
+      DEVICE_FRIENDLY: "OnePlus10Pro"
+      ANDROID_VERSION: "OOS14"
     steps:
-      - name: "Create working dir"
-        run: mkdir -p "${kernelDir}"
+      - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: "Install prerequisites"
+      - name: Install build dependencies
+        shell: bash
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential bc curl git zip jq \
-            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
-            libssl-dev libfl-dev lftp zstd wget
+            bc bison build-essential ccache clang curl flex git jq libelf-dev \
+            liblz4-tool libncurses5-dev libssl-dev lld llvm lsb-release \
+            pkg-config python3 python3-pip rsync tar unzip wget xz-utils zip \
+            dwarves repo
 
-      - name: "Clone kernel source"
-        working-directory: "./${{ env.kernelDir }}"
-        run: git clone --recursive --branch "${kernelBranch}" "${kernelRepo}" "${kernelName}" --depth=1
-
-      - name: "Get toolchains"
-        working-directory: "./${{ env.kernelDir }}"
-        env:
-          toolchains: "${{ toJSON(matrix.repos.toolchains) }}"
+      - name: Prepare ccache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ github.workflow }}-${{ github.ref_name }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ runner.arch }}-${{ github.workflow }}-
+            ccache-${{ runner.os }}-${{ runner.arch }}-
+      - name: Configure ccache
+        shell: bash
         run: |
-          count="$(jq 'length' <<<"$toolchains")"
-          for ((i=0; i<count; i++)); do
-            name="$(jq -r ".[$i].name" <<<"$toolchains")"
-            repo="$(jq -r ".[$i].repo" <<<"$toolchains")"
-            branch="$(jq -r ".[$i].branch" <<<"$toolchains")"
-            git clone --recursive --branch "$branch" "$repo" "$name" --depth=1
-            echo "$(pwd)/$name" >> "$GITHUB_PATH"
-            echo "$(pwd)/$name/bin" >> "$GITHUB_PATH"
-          done
-          echo "Toolchains added to PATH."
+          mkdir -p "${CCACHE_DIR}"
+          ccache --zero-stats || true
+          ccache --max-size="${{ github.event.inputs.ccachesize || '15G' }}"
 
-      - name: "Set build args"
-        id: args
-        working-directory: "./${{ env.kernelDir }}"
-        env:
-          params: "${{ toJSON(matrix.repos.params) }}"
-          extraParams: "${{ toJSON(matrix.repos.extraParams) }}"
+      - name: Clone OnePlus kernel sources (from manifest)
+        shell: bash
         run: |
-          THREADS="$(nproc --all)"
-          ARCH="$(jq -r '.ARCH // ""' <<<"$params")"
-          CROSS_COMPILE="$(jq -r '.CROSS_COMPILE // ""' <<<"$params")"
-          CROSS_COMPILE_COMPAT="$(jq -r '.CROSS_COMPILE_COMPAT // ""' <<<"$params")"
-          CLANG_TRIPLE="$(jq -r '.CLANG_TRIPLE // ""' <<<"$params")"
-          AR="$(jq -r '.AR // ""' <<<"$params")"
-          CC="$(jq -r '.CC // ""' <<<"$params")"
+          set -euxo pipefail
 
-          echo "ARCH=$ARCH" >> "$GITHUB_ENV"
+          # OnePlus OSS remotes
+          git clone --depth=1 \
+            -b oneplus/sm8450_u_14.0.0_oneplus_10pro \
+            https://github.com/OnePlusOSS/android_kernel_common_oneplus_sm8450 \
+            kernel_platform/common
 
-          args="-j${THREADS}"
-          if [ -n "${{ env.OUT_DIR }}" ]; then
-            mkdir -p "$(pwd)/${{ env.OUT_DIR }}"
-            args="$args O=$(pwd)/${{ env.OUT_DIR }}"
+          git clone --depth=1 \
+            -b oneplus/sm8450_u_14.0.0_oneplus_10pro \
+            https://github.com/OnePlusOSS/android_kernel_oneplus_sm8450 \
+            kernel_platform/msm-kernel
+
+          # modules + devicetree (root path per manifest)
+          git clone --depth=1 \
+            -b oneplus/sm8450_u_14.0.0_oneplus_10pro \
+            https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8450 \
+            modules_and_dt
+          # Move content from helper folder to workspace root if needed
+          shopt -s dotglob
+          if [ -d modules_and_dt ] && [ -n "$(ls -A modules_and_dt)" ]; then
+            cp -a modules_and_dt/* .
           fi
-          [ -n "$ARCH" ] && args="$args ARCH=$ARCH"
-          [ -n "$CROSS_COMPILE" ] && args="$args CROSS_COMPILE=$CROSS_COMPILE"
-          [ -n "$CLANG_TRIPLE" ] && args="$args CLANG_TRIPLE=$CLANG_TRIPLE"
-          [ -n "$CROSS_COMPILE_COMPAT" ] && args="$args CROSS_COMPILE_ARM32=$CROSS_COMPILE_COMPAT"
-          [ -n "$AR" ] && args="$args AR=$AR"
-          [ -n "$CC" ] && args="$args CC=$CC"
+          rm -rf modules_and_dt
 
-          extra="$(jq -r 'to_entries | map(select(.value != "")) | map("\(.key)=\(.value)") | join(" ")' <<<"$extraParams")"
-          echo "args=$args $extra" >> "$GITHUB_OUTPUT"
-
-      - name: "Update KernelSU (optional)"
-        if: ${{ env.withKernelSU == 'true' }}
-        working-directory: "./${{ env.kernelDir }}/${{ env.kernelName }}"
+      - name: Clone Qualcomm/CodeLinaro prebuilts (from manifest SHAs)
+        shell: bash
         run: |
-          rm -rf ./KernelSU ./drivers/kernelsu || true
-          curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
-          echo -e "\nCONFIG_KPROBES=y" >> "./arch/${ARCH}/configs/${{ env.DEFCONFIG_NAME }}"
-          echo -e "\nCONFIG_HAVE_KPROBES=y" >> "./arch/${ARCH}/configs/${{ env.DEFCONFIG_NAME }}"
+          set -euxo pipefail
+          clone_at_rev () {
+            local url="$1" path="$2" rev="$3"
+            git clone --depth=1 "$url" "$path" || git clone "$url" "$path"
+            pushd "$path"
+              # Ensure we have the exact commit; fetch if not in shallow clone
+              git fetch --depth=1 origin "$rev" || git fetch origin "$rev"
+              git checkout "$rev"
+            popd
+          }
 
-      - name: "Build"
-        working-directory: "./${{ env.kernelDir }}/${{ env.kernelName }}"
+          # From manifest:
+          # <project name="kernel/prebuilts/build-tools" path="kernel_platform/prebuilts/kernel-build-tools" revision="10ab783184f77d3ea15bf666426a7138b0f62bfc" upstream="refs/heads/ks-kernel.lnx.1.0.r1-rel"/>
+          clone_at_rev https://git.codelinaro.org/clo/la/kernel/prebuilts/build-tools.git \
+            kernel_platform/prebuilts/kernel-build-tools \
+            10ab783184f77d3ea15bf666426a7138b0f62bfc
+
+          # <project name="kernel_platform/external/dtc" revision="deb932d81061c472e8bb2648a409a456e6e84997" upstream="refs/heads/kernel.build.lnx.1.0.r1-rel"/>
+          clone_at_rev https://git.codelinaro.org/clo/la/kernel_platform/external/dtc.git \
+            kernel_platform/external/dtc \
+            deb932d81061c472e8bb2648a409a456e6e84997
+
+          # <project name="kernel_platform/kernel/prebuilts/mainline/arm64" revision="de12e10cfe8d67d5c0627069306fda939f52154a" upstream="refs/heads/kernel.lnx.5.10.r1-rel"/>
+          clone_at_rev https://git.codelinaro.org/clo/la/kernel_platform/kernel/prebuilts/mainline/arm64.git \
+            kernel_platform/kernel/prebuilts/mainline/arm64 \
+            de12e10cfe8d67d5c0627069306fda939f52154a
+
+          # <project name="kernel_platform/prebuilts/build-tools" revision="846214bd11004546cd3fc2590c73c628fcd6778c" upstream="refs/heads/ks-kernel.lnx.1.0.r1-rel"/>
+          clone_at_rev https://git.codelinaro.org/clo/la/kernel_platform/prebuilts/build-tools.git \
+            kernel_platform/prebuilts/build-tools \
+            846214bd11004546cd3fc2590c73c628fcd6778c
+
+          # <project name="kernel_platform/system/tools/mkbootimg" path="kernel_platform/tools/mkbootimg" revision="08410f46318f3f301b96ed058466ab0dde0b050b" upstream="refs/heads/ks-kernel.lnx.1.0.r1-rel"/>
+          clone_at_rev https://git.codelinaro.org/clo/la/kernel_platform/system/tools/mkbootimg.git \
+            kernel_platform/tools/mkbootimg \
+            08410f46318f3f301b96ed058466ab0dde0b050b
+
+          # <project name="kernelplatform/prebuilts-master/clang/host/linux-x86" path="kernel_platform/prebuilts-master/clang/host/linux-x86" revision="0fc3d01a780023469b7acc18c56a9cf5099a6d6c" upstream="refs/heads/ks-kernel.lnx.1.0.r1-rel"/>
+          clone_at_rev https://git.codelinaro.org/clo/la/kernelplatform/prebuilts-master/clang/host/linux-x86.git \
+            kernel_platform/prebuilts-master/clang/host/linux-x86 \
+            0fc3d01a780023469b7acc18c56a9cf5099a6d6c
+
+          # <project name="kernelplatform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8" path="kernel_platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8" revision="c9f87ae369034b4942536a1c5bd62e4cd1d828e3" upstream="refs/heads/ks-kernel.lnx.1.0.r1-rel"/>
+          clone_at_rev https://git.codelinaro.org/clo/la/kernelplatform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8.git \
+            kernel_platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8 \
+            c9f87ae369034b4942536a1c5bd62e4cd1d828e3
+
+      - name: Apply linkfiles from manifest
+        shell: bash
         run: |
-          make "${{ env.DEFCONFIG_NAME }}" ${{ steps.args.outputs.args }}
-          make ${{ steps.args.outputs.args }}
+          set -euxo pipefail
+          # The OnePlus msm-kernel repo provides these build.config files at its root.
+          # Link them into common as the manifest does via <linkfile>.
+          ln -sf "${PWD}/kernel_platform/msm-kernel/build.config.msm.waipio" \
+                 "${PWD}/kernel_platform/common/build.config.msm.waipio"
+          ln -sf "${PWD}/kernel_platform/msm-kernel/build.config.msm.waipio.tuivm" \
+                 "${PWD}/kernel_platform/common/build.config.msm.waipio.tuivm"
+          ln -sf "${PWD}/kernel_platform/msm-kernel/build.config.msm.lahaina" \
+                 "${PWD}/kernel_platform/common/build.config.msm.lahaina"
 
-      - name: "Upload artifacts"
+      - name: Set up LLVM and PATH
+        shell: bash
+        run: |
+          set -euxo pipefail
+          echo "${GITHUB_WORKSPACE}/${CLANG_DIR}/bin" >> $GITHUB_PATH
+          echo "${GITHUB_WORKSPACE}/${GCC_HOST_DIR}/bin" >> $GITHUB_PATH
+
+      - name: Build kernel (waipio / SM8450)
+        shell: bash
+        env:
+          BUILD_CONFIG: ${{ github.event.inputs.build_config }}
+          CCACHE_EXEC: ccache
+        run: |
+          set -euxo pipefail
+
+          # Determine build script location
+          BUILD_SH=""
+          if [ -x kernel_platform/build/build.sh ]; then
+            BUILD_SH=kernel_platform/build/build.sh
+          elif [ -x kernel_platform/msm-kernel/build/build.sh ]; then
+            BUILD_SH=kernel_platform/msm-kernel/build/build.sh
+          else
+            echo "ERROR: Could not find build.sh"; ls -R kernel_platform || true; exit 1
+          fi
+
+          # Export commonly expected vars for Android kernel build system
+          export LLVM=1
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export PATH="${GITHUB_WORKSPACE}/${CLANG_DIR}/bin:${GITHUB_WORKSPACE}/${GCC_HOST_DIR}/bin:${PATH}"
+          export CC=clang
+          export LD=ld.lld
+          export NM=llvm-nm
+          export OBJCOPY=llvm-objcopy
+          export OBJDUMP=llvm-objdump
+          export READELF=llvm-readelf
+          export STRIP=llvm-strip
+          export CLANG_TRIPLE=aarch64-linux-gnu-
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+          export DTC_EXT=${GITHUB_WORKSPACE}/kernel_platform/external/dtc/dtc
+
+          echo "Using BUILD_CONFIG=${BUILD_CONFIG}"
+          chmod +x "${BUILD_SH}"
+          "${BUILD_SH}" -j"$(nproc)" --no-mrproper
+
+          echo "Build finished. Contents of dist:"
+          ls -al "${DIST_DIR}" || true
+
+      - name: Create AnyKernel3 package
+        if: ${{ github.event.inputs.package_anykernel == 'true' }}
+        shell: bash
+        run: |
+          set -euxo pipefail
+          DIST="${DIST_DIR}"
+          test -d "${DIST}" || { echo "Dist dir not found: ${DIST}"; exit 1; }
+
+          # Pull artifacts produced by Qualcomm/OnePlus build system
+          IMG_GZ_DTB="${DIST}/Image.gz-dtb"
+          DTBO_IMG="${DIST}/dtbo.img"
+          VMLINUX="${DIST}/vmlinux"
+          MODULES_TAR="${DIST}/modules.tar.gz"
+
+          # Sanity checks
+          test -f "${IMG_GZ_DTB}" || { echo "Missing Image.gz-dtb in dist"; ls -al "${DIST}"; exit 1; }
+
+          # Clone AnyKernel3
+          rm -rf AnyKernel3
+          git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git
+
+          # Basic device tailoring
+          pushd AnyKernel3
+            # Keep default anykernel.sh but set defaults via env
+            # Copy kernel image
+            cp "${IMG_GZ_DTB}" Image.gz-dtb
+
+            # Include dtbo if present
+            if [ -f "${DTBO_IMG}" ]; then
+              cp "${DTBO_IMG}" dtbo.img
+            fi
+
+            # Include modules if provided (standard dist layout)
+            if [ -f "${MODULES_TAR}" ]; then
+              mkdir -p modules
+              tar -xzf "${MODULES_TAR}" -C modules
+            fi
+
+            ZIP_NAME="NetHunter-${DEVICE_FRIENDLY}-${ANDROID_VERSION}-${DEVICE_CODENAME}-$(date +%Y%m%d)-${GITHUB_SHA::7}.zip"
+            zip -r9 "../${ZIP_NAME}" . -x ".git/*" -x "*.zip"
+          popd
+
+          echo "ANYKERNEL_ZIP=${ZIP_NAME}" >> $GITHUB_ENV
+
+      - name: Upload dist artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: "${{ env.kernelName }}_${{ env.kernelDevice }}_out"
-          path: "./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.OUT_DIR }}"
+          name: dist-${{ env.DEVICE_CODENAME }}-${{ github.sha }}
+          path: |
+            ${{ env.DIST_DIR }}/*
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload AnyKernel3 ZIP
+        if: ${{ github.event.inputs.package_anykernel == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: anykernel3-${{ env.DEVICE_CODENAME }}-${{ github.sha }}
+          path: |
+            ${{ github.workspace }}/NetHunter-*.zip
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Show ccache stats
+        if: always()
+        shell: bash
+        run: |
+          ccache --show-stats || true
