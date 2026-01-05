@@ -12,9 +12,9 @@ on:
         required: false
         default: "true"
       ccachesize:
-        description: ccache max size (e.g. 15G)
+        description: ccache max size (e.g. 100G)
         required: false
-        default: 15G
+        default: 100G
 
 jobs:
   build:
@@ -38,6 +38,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Clean up disk space (before build)
+        shell: bash
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force || true
+          echo "Disk space after cleanup:"
+          df -h
+
       - name: Install build dependencies
         shell: bash
         run: |
@@ -47,6 +60,16 @@ jobs:
             liblz4-tool libncurses5-dev libssl-dev lld llvm lsb-release \
             pkg-config python3 python3-pip rsync tar unzip wget xz-utils zip \
             dwarves repo
+
+      - name: Clean up disk space (after dependencies)
+        shell: bash
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          sudo apt-get clean
+          sudo rm -rf /var/lib/apt/lists/*
+          echo "Disk space after cleanup:"
+          df -h
 
       - name: Prepare ccache
         uses: actions/cache@v4
@@ -62,7 +85,16 @@ jobs:
         run: |
           mkdir -p "${CCACHE_DIR}"
           ccache --zero-stats || true
-          ccache --max-size="${{ github.event.inputs.ccachesize || '15G' }}"
+          ccache --max-size="${{ github.event.inputs.ccachesize || '100G' }}"
+
+      - name: Clean up disk space (after cache setup)
+        shell: bash
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          sudo rm -rf /tmp/* || true
+          echo "Disk space after cleanup:"
+          df -h
 
       - name: Clone OnePlus kernel sources (from manifest)
         shell: bash
@@ -88,6 +120,16 @@ jobs:
             cp -a modules_and_dt/* .
           fi
           rm -rf modules_and_dt
+
+      - name: Clean up disk space (after kernel sources cloned)
+        shell: bash
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          # Clean up any .git directories in cloned repos to save space
+          find kernel_platform -name ".git" -type d -exec rm -rf {} + || true
+          echo "Disk space after cleanup:"
+          df -h
 
       - name: Clone Qualcomm/CodeLinaro prebuilts (from manifest SHAs)
         shell: bash
