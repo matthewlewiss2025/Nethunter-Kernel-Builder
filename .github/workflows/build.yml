@@ -35,7 +35,7 @@ jobs:
       ANDROID_VERSION: "OOS14"
     steps:
       - name: Checkout repository
-      uses: actions/checkout@v4
+        uses: actions/checkout@v4
 
       - name: Install build dependencies
         shell: bash
@@ -55,6 +55,7 @@ jobs:
           restore-keys: |
             ccache-${{ runner.os }}-${{ runner.arch }}-${{ github.workflow }}-
             ccache-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Configure ccache
         shell: bash
         run: |
@@ -66,18 +67,15 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-
           # OnePlus OSS remotes
           git clone --depth=1 \
             -b oneplus/sm8450_u_14.0.0_oneplus_10pro \
             https://github.com/OnePlusOSS/android_kernel_common_oneplus_sm8450 \
             kernel_platform/common
-
           git clone --depth=1 \
             -b oneplus/sm8450_u_14.0.0_oneplus_10pro \
             https://github.com/OnePlusOSS/android_kernel_oneplus_sm8450 \
             kernel_platform/msm-kernel
-
           # modules + devicetree (root path per manifest)
           git clone --depth=1 \
             -b oneplus/sm8450_u_14.0.0_oneplus_10pro \
@@ -103,38 +101,31 @@ jobs:
               git checkout "$rev"
             popd
           }
-
           # From manifest:
           # <project name="kernel/prebuilts/build-tools" path="kernel_platform/prebuilts/kernel-build-tools" revision="10ab783184f77d3ea15bf666426a7138b0f62bfc" upstream="refs/heads/ks-kernel.lnx.1.0.r1-rel"/>
           clone_at_rev https://git.codelinaro.org/clo/la/kernel/prebuilts/build-tools.git \
             kernel_platform/prebuilts/kernel-build-tools \
             10ab783184f77d3ea15bf666426a7138b0f62bfc
-
           # <project name="kernel_platform/external/dtc" revision="deb932d81061c472e8bb2648a409a456e6e84997" upstream="refs/heads/kernel.build.lnx.1.0.r1-rel"/>
           clone_at_rev https://git.codelinaro.org/clo/la/kernel_platform/external/dtc.git \
             kernel_platform/external/dtc \
             deb932d81061c472e8bb2648a409a456e6e84997
-
           # <project name="kernel_platform/kernel/prebuilts/mainline/arm64" revision="de12e10cfe8d67d5c0627069306fda939f52154a" upstream="refs/heads/kernel.lnx.5.10.r1-rel"/>
           clone_at_rev https://git.codelinaro.org/clo/la/kernel_platform/kernel/prebuilts/mainline/arm64.git \
             kernel_platform/kernel/prebuilts/mainline/arm64 \
             de12e10cfe8d67d5c0627069306fda939f52154a
-
           # <project name="kernel_platform/prebuilts/build-tools" revision="846214bd11004546cd3fc2590c73c628fcd6778c" upstream="refs/heads/ks-kernel.lnx.1.0.r1-rel"/>
           clone_at_rev https://git.codelinaro.org/clo/la/kernel_platform/prebuilts/build-tools.git \
             kernel_platform/prebuilts/build-tools \
             846214bd11004546cd3fc2590c73c628fcd6778c
-
           # <project name="kernel_platform/system/tools/mkbootimg" path="kernel_platform/tools/mkbootimg" revision="08410f46318f3f301b96ed058466ab0dde0b050b" upstream="refs/heads/ks-kernel.lnx.1.0.r1-rel"/>
           clone_at_rev https://git.codelinaro.org/clo/la/kernel_platform/system/tools/mkbootimg.git \
             kernel_platform/tools/mkbootimg \
             08410f46318f3f301b96ed058466ab0dde0b050b
-
           # <project name="kernelplatform/prebuilts-master/clang/host/linux-x86" path="kernel_platform/prebuilts-master/clang/host/linux-x86" revision="0fc3d01a780023469b7acc18c56a9cf5099a6d6c" upstream="refs/heads/ks-kernel.lnx.1.0.r1-rel"/>
           clone_at_rev https://git.codelinaro.org/clo/la/kernelplatform/prebuilts-master/clang/host/linux-x86.git \
             kernel_platform/prebuilts-master/clang/host/linux-x86 \
             0fc3d01a780023469b7acc18c56a9cf5099a6d6c
-
           # <project name="kernelplatform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8" path="kernel_platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8" revision="c9f87ae369034b4942536a1c5bd62e4cd1d828e3" upstream="refs/heads/ks-kernel.lnx.1.0.r1-rel"/>
           clone_at_rev https://git.codelinaro.org/clo/la/kernelplatform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8.git \
             kernel_platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8 \
@@ -167,7 +158,6 @@ jobs:
           CCACHE_EXEC: ccache
         run: |
           set -euxo pipefail
-
           # Determine build script location
           BUILD_SH=""
           if [ -x kernel_platform/build/build.sh ]; then
@@ -177,7 +167,6 @@ jobs:
           else
             echo "ERROR: Could not find build.sh"; ls -R kernel_platform || true; exit 1
           fi
-
           # Export commonly expected vars for Android kernel build system
           export LLVM=1
           export ARCH=arm64
@@ -194,11 +183,9 @@ jobs:
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
           export DTC_EXT=${GITHUB_WORKSPACE}/kernel_platform/external/dtc/dtc
-
           echo "Using BUILD_CONFIG=${BUILD_CONFIG}"
           chmod +x "${BUILD_SH}"
           "${BUILD_SH}" -j"$(nproc)" --no-mrproper
-
           echo "Build finished. Contents of dist:"
           ls -al "${DIST_DIR}" || true
 
@@ -209,41 +196,33 @@ jobs:
           set -euxo pipefail
           DIST="${DIST_DIR}"
           test -d "${DIST}" || { echo "Dist dir not found: ${DIST}"; exit 1; }
-
           # Pull artifacts produced by Qualcomm/OnePlus build system
           IMG_GZ_DTB="${DIST}/Image.gz-dtb"
           DTBO_IMG="${DIST}/dtbo.img"
           VMLINUX="${DIST}/vmlinux"
           MODULES_TAR="${DIST}/modules.tar.gz"
-
           # Sanity checks
           test -f "${IMG_GZ_DTB}" || { echo "Missing Image.gz-dtb in dist"; ls -al "${DIST}"; exit 1; }
-
           # Clone AnyKernel3
           rm -rf AnyKernel3
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git
-
           # Basic device tailoring
           pushd AnyKernel3
             # Keep default anykernel.sh but set defaults via env
             # Copy kernel image
             cp "${IMG_GZ_DTB}" Image.gz-dtb
-
             # Include dtbo if present
             if [ -f "${DTBO_IMG}" ]; then
               cp "${DTBO_IMG}" dtbo.img
             fi
-
             # Include modules if provided (standard dist layout)
             if [ -f "${MODULES_TAR}" ]; then
               mkdir -p modules
               tar -xzf "${MODULES_TAR}" -C modules
             fi
-
-            ZIP_NAME="NetHunter-${DEVICE_FRIENDLY}-${ANDROID_VERSION}-${DEVICE_CODENAME}-$(date +%Y%m%d)-${GITHUB_SHA::7}.zip"
+            ZIP_NAME="NetHunter-${DEVICE_FRIENDLY}-${ANDROID_VERSION}-${DEVICE_CODENAME}-$(date +%Y%m%d)-${GITHUB_SHA:0:7}.zip"
             zip -r9 "../${ZIP_NAME}" . -x ".git/*" -x "*.zip"
           popd
-
           echo "ANYKERNEL_ZIP=${ZIP_NAME}" >> $GITHUB_ENV
 
       - name: Upload dist artifacts
