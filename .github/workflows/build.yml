@@ -102,7 +102,8 @@ jobs:
 
       - name: Build Kernel
         shell: bash
-        run: |
+        run: | . env.sh
+          build/build.sh
           export CCACHE_DIR="${CCACHE_DIR}"
           make -C kernel_platform/msm-kernel O=out/msm-kernel distclean
           make -C kernel_platform/msm-kernel O=out/msm-kernel BUILD_CONFIG=${{ github.event.inputs.build_config }}
