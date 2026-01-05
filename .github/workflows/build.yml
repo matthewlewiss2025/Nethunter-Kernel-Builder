@@ -102,7 +102,7 @@ jobs:
 
       - name: Build Kernel
         shell: bash
-        run: | . env.sh
+        run: | 
           build/build.sh
           export CCACHE_DIR="${CCACHE_DIR}"
           make -C kernel_platform/msm-kernel O=out/msm-kernel distclean
