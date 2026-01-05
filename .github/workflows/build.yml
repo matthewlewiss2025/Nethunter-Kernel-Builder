@@ -113,7 +113,7 @@ jobs:
           df -h
 
       - name: Upload Kernel Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: kernel-build-artifacts
           path: out/msm-kernel/dist
