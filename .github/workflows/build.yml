@@ -48,7 +48,7 @@ jobs:
 
       # Optionally, you can upload artifacts (e.g., kernel image) after build
       - name: Upload Kernel Image
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: kernel-image
           path: kernel/out/arch/arm64/boot/Image.gz
