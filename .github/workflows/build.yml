@@ -1,4 +1,4 @@
-  name: Nethunter Kernel Build
+name: Nethunter Kernel Build
 
 on:
   push:
@@ -13,20 +13,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Set up the Android NDK
+      # Set up Android NDK using setup-android action
       - name: Set up Android NDK
-        run: |
-          wget https://dl.google.com/android/repository/android-ndk-r23-linux.zip
-          unzip android-ndk-r23-linux.zip
-          rm android-ndk-r23-linux.zip
-          echo "NDK setup complete."
-          echo "ANDROID_NDK_HOME=$(pwd)/android-ndk-r23" >> $GITHUB_ENV
+        uses: actions/setup-android@v2
+        with:
+          ndk-version: 'r23'
 
       # Install dependencies (e.g., clang, make, etc.)
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y clang make gcc bc libssl-dev libncurses-dev
+          sudo apt install -y clang make gcc bc libssl-dev libncurses-dev git curl
 
       # Clone kernel and device tree sources
       - name: Clone kernel source
@@ -46,6 +43,7 @@ jobs:
         run: |
           cd dtc
           make
+          sudo make install
 
       # Make sure the build script is executable
       - name: Make build script executable
