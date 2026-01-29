@@ -1,4 +1,4 @@
-name: Nethunter Kernel Build
+  name: Nethunter Kernel Build
 
 on:
   push:
@@ -20,6 +20,7 @@ jobs:
           unzip android-ndk-r23-linux.zip
           rm android-ndk-r23-linux.zip
           echo "NDK setup complete."
+          echo "ANDROID_NDK_HOME=$(pwd)/android-ndk-r23" >> $GITHUB_ENV
 
       # Install dependencies (e.g., clang, make, etc.)
       - name: Install dependencies
@@ -40,15 +41,27 @@ jobs:
           git clone https://android.googlesource.com/platform/external/dtc --depth 1
           cd dtc && ln -s dtc-parser.tab.h dtc-parser.h
 
-      # Build kernel
-      - name: Build kernel
+      # Optionally, build DTC if not pre-built
+      - name: Build DTC
         run: |
-          cd kernel
-          make ARCH=arm64 -j$(nproc) O=out
+          cd dtc
+          make
 
-      # Optionally, you can upload artifacts (e.g., kernel image) after build
-      - name: Upload Kernel Image
+      # Make sure the build script is executable
+      - name: Make build script executable
+        run: |
+          chmod +x ./kernel_platform/oplus/build/oplus_build_kernel.sh
+
+      # Run the kernel build script
+      - name: Build kernel using the custom script
+        run: |
+          ./kernel_platform/oplus/build/oplus_build_kernel.sh waipio gki
+
+      # Upload Kernel Image and Modules
+      - name: Upload Kernel Image and Modules
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-image
-          path: kernel/out/arch/arm64/boot/Image.gz
+          name: kernel-artifacts
+          path: |
+            kernel/out/arch/arm64/boot/Image.gz
+            kernel/out/lib/modules
