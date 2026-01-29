@@ -11,11 +11,11 @@ jobs:
     steps:
       # Checkout code from your repository
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       # Set up Android NDK using setup-android action
       - name: Set up Android NDK
-        uses: actions/setup-android@v2
+        uses: actions/setup-android@v3
         with:
           ndk-version: 'r23'
 
