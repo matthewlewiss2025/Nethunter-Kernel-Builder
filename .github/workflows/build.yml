@@ -15,7 +15,7 @@ jobs:
 
       # Set up Android NDK using setup-android action
       - name: Set up Android NDK
-        uses: actions/setup-android@v3
+        uses: actions/setup-android@v2
         with:
           ndk-version: 'r23'
 
