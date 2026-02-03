@@ -40,7 +40,7 @@ jobs:
           echo "Kernel build completed!"
 
       - name: "💛 Upload Kernel Image"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Kernel-Image-${{ github.run_number }}
           path: ./kernel/out/arch/arm64/boot/Image
@@ -48,7 +48,7 @@ jobs:
           retention-days: 7
 
       - name: "💙 Upload Kernel Image.gz"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Kernel-Image-gz-${{ github.run_number }}
           path: ./kernel/out/arch/arm64/boot/Image.gz
@@ -56,7 +56,7 @@ jobs:
           retention-days: 7
 
       - name: "💜 Upload dtb Files"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Kernel-DTB-${{ github.run_number }}
           path: ./kernel/out/arch/arm64/boot/dtb
@@ -64,7 +64,7 @@ jobs:
           retention-days: 7
 
       - name: "❤️ Upload dtbo.img"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Kernel-DTBO-${{ github.run_number }}
           path: ./kernel/out/arch/arm64/boot/dtbo.img
