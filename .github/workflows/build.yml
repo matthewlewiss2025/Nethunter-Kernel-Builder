@@ -1,4 +1,4 @@
-name: "Build OnePlus 10 Pro Kernel"
+name: Build OnePlus 10 Pro Kernel
 
 env:
   CONFIGURATION: "repos.json"
@@ -11,6 +11,7 @@ jobs:
   Build-Kernel:
     name: "🐎 Build OnePlus Kernel"
     runs-on: ubuntu-latest
+
     steps:
       - name: "😄 Checkout Repository"
         uses: actions/checkout@v3
@@ -36,78 +37,6 @@ jobs:
         run: |
           export PATH=$HOME/bin:$PATH
           chmod +x build/oplus_build_kernel.sh
-          # Build kernel using the specific platform and options
-          ./build/oplus_build_kernel.sh waipio gki
-          echo "Kernel build completed!"
-
-      - name: "💛 Upload Kernel Image"
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kernel-Image-${{ github.run_number }}
-          path: ./kernel/out/arch/arm64/boot/Image
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: "💙 Upload Kernel Image.gz"
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kernel-Image-gz-${{ github.run_number }}
-          path: ./kernel/out/arch/arm64/boot/Image.gz
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: "💜 Upload dtb Files"
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kernel-DTB-${{ github.run_number }}
-          path: ./kernel/out/arch/arm64/boot/dtb
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: "❤️ Upload dtbo.img"
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kernel-DTBO-${{ github.run_number }}
-          path: ./kernel/out/arch/arm64/boot/dtbo.img
-          if-no-files-found: ignorename: "Build OnePlus 10 Pro Kernel"
-
-env:
-  CONFIGURATION: "repos.json"
-  OUT_DIR: "out"
-
-on:
-  workflow_dispatch:
-
-jobs:
-  Build-Kernel:
-    name: "🐎 Build OnePlus Kernel"
-    runs-on: ubuntu-latest
-    steps:
-      - name: "😄 Checkout Repository"
-        uses: actions/checkout@v3
-
-      - name: "✨ Install Prerequisites"
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential bc curl git zip ftp gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi libssl-dev lftp zstd wget libfl-dev python3 libarchive-tools jq
-          mkdir -p ~/bin
-          curl -o ~/bin/repo https://storage.googleapis.com/git-repo-downloads/repo
-          chmod a+x ~/bin/repo
-          export PATH=$HOME/bin:$PATH
-
-      - name: "🌟 Initialize Source with Manifest"
-        run: |
-          export PATH=$HOME/bin:$PATH
-          repo init -u https://github.com/OnePlusOSS/kernel_manifest.git -b oneplus/sm8450 -m oneplus_10_pro_s.xml --depth=1
-          repo sync
-          echo "Source initialized and synced."
-
-      - name: "🌟 Build Kernel with build script"
-        working-directory: ./kernel_platform/oplus
-        run: |
-          export PATH=$HOME/bin:$PATH
-          chmod +x build/oplus_build_kernel.sh
-          # Build kernel using the specific platform and options
           ./build/oplus_build_kernel.sh waipio gki
           echo "Kernel build completed!"
 
@@ -141,15 +70,6 @@ jobs:
           name: Kernel-DTBO-${{ github.run_number }}
           path: ./kernel/out/arch/arm64/boot/dtbo.img
           if-no-files-found: ignore
-          retention-days: 7
-
-      - name: "🖤 Upload Complete Kernel Directory"
-        uses: actions/upload-artifact@v4
-        with:
-          name: Complete-Kernel-Files-${{ github.run_number }}
-          path: ./kernel/out/
-          if-no-files-found: ignore
-          retention-days: 7
           retention-days: 7
 
       - name: "🖤 Upload Complete Kernel Directory"
