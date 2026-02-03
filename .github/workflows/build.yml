@@ -72,7 +72,7 @@ jobs:
           retention-days: 7
 
       - name: "🖤 Upload Complete Kernel Directory"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Complete-Kernel-Files-${{ github.run_number }}
           path: ./kernel/out/
