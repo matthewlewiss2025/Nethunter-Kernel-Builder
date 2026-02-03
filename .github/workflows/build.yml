@@ -25,11 +25,16 @@ jobs:
           chmod a+x ~/bin/repo
           export PATH=$HOME/bin:$PATH
 
+      - name: "Cleanup previous .git directories"
+        run: |
+          rm -rf .git
+          rm -rf /home/runner/work/Nethunter-Kernel-Builder/Nethunter-Kernel-Builder/.git
+
       - name: "🌟 Initialize Source with Manifest"
         run: |
           export PATH=$HOME/bin:$PATH
           repo init -u https://github.com/OnePlusOSS/kernel_manifest.git -b oneplus/sm8450 -m oneplus_10_pro_s.xml --depth=1
-          repo sync
+          repo sync --force-sync
           echo "Source initialized and synced."
 
       - name: "🌟 Build Kernel with build script"
