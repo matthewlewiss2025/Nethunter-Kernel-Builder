@@ -4,6 +4,7 @@
     "device": "2215",
     "repo": "https://github.com/OnePlusOSS/kernel_manifest.git",
     "branch": "oneplus/sm8450",
+    "manifest": "oneplus_10_pro_s.xml",
     "params": {
       "ARCH": "arm64",
       "CROSS_COMPILE": "aarch64-linux-gnu-",
